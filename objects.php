@@ -1,6 +1,6 @@
 <?php
 /*
-Plugin Name: Object
+Plugin Name: Objects
 Description: Manage your object collection with Wordpress
 Version: 0.1
 Author: Frankie Roberto
@@ -10,44 +10,39 @@ Tags: museums, collection, objects
 
 function object_submit_meta_box() {
 ?>
-<div class="submitbox" id="submitlink">
+	<div class="submitbox" id="submitlink">
 
-<div id="minor-publishing">
+		<div id="minor-publishing">
 
-<?php // Hidden submit button early on so that the browser chooses the right button when form is submitted with Return key ?>
-<div style="display:none;">
-<input type="submit" name="save" value="<?php esc_attr_e('Save'); ?>" />
-</div>
+			<?php // Hidden submit button early on so that the browser chooses the right button when form is submitted with Return key ?>
+			<div style="display:none;">
+				<input type="submit" name="save" value="<?php esc_attr_e('Save'); ?>" />
+			</div>
+		</div>
 
-</div>
+		<div id="major-publishing-actions">
+			<?php do_action('post_submitbox_start'); ?>
 
-<div id="major-publishing-actions">
-<?php do_action('post_submitbox_start'); ?>
-<div id="delete-action">
-<?php
-if ( !empty($_GET['action']) && 'edit' == $_GET['action'] && current_user_can('manage_links') ) { ?>
-	<a class="submitdelete deletion" href="<?php echo wp_nonce_url("link.php?action=delete&amp;link_id=$link->link_id", 'delete-bookmark_' . $link->link_id); ?>" onclick="if ( confirm('<?php echo esc_js(sprintf(__("You are about to delete this link '%s'\n  'Cancel' to stop, 'OK' to delete."), $link->link_name )); ?>') ) {return true;}return false;"><?php _e('Delete'); ?></a>
-<?php } ?>
-</div>
 
-<div id="publishing-action">
-<?php if ( !empty($link->link_id) ) { ?>
-	<input name="save" type="submit" class="button-primary" id="publish" tabindex="4" accesskey="p" value="<?php esc_attr_e('Update Link') ?>" />
-<?php } else { ?>
-	<input name="save" type="submit" class="button-primary" id="publish" tabindex="4" accesskey="p" value="<?php esc_attr_e('Add Link') ?>" />
-<?php } ?>
-</div>
-<div class="clear"></div>
-</div>
-<?php do_action('submitlink_box'); ?>
-<div class="clear"></div>
-</div>
+			<div id="publishing-action">
+			<?php if ( !empty($link->link_id) ) { ?>
+				<input name="save" type="submit" class="button-primary" id="publish" tabindex="4" accesskey="p" value="<?php esc_attr_e('Update Object') ?>" />
+			<?php } else { ?>
+				<input name="save" type="submit" class="button-primary" id="publish" tabindex="4" accesskey="p" value="<?php esc_attr_e('Add Object') ?>" />
+			<?php } ?>
+			</div>
+
+			<div class="clear"></div>
+		</div>
+		<?php do_action('submitlink_box'); ?>
+		<div class="clear"></div>
+	</div>
 <?php
 }
 #add_meta_box('linksubmitdiv', __('Save'), 'object_submit_meta_box', 'link', 'side', 'core');
 
 
-function object_edit_formt() {
+function object_edit_form() {
 		if ( !empty($object_id) ) {
 			$heading = sprintf( __( '<a href="%s">Links</a> / Edit Link' ), 'link-manager.php' );
 			$submit_text = __('Update Link');
@@ -65,31 +60,31 @@ function object_edit_formt() {
 
 
 		<div class="wrap">
-			<h2>Add Object</h2>
+			<h2>Add New Object</h2>
 			
-			<div id="poststuff" class="metabox-holder<?php echo 2 == $screen_layout_columns ? ' has-right-sidebar' : ''; ?>">
+			<div id="poststuff" class="metabox-holder has-right-sidebar">
 
 			<div id="side-info-column" class="inner-sidebar">
-			<?php
-
-			do_action('submitlink_box');
-			$side_meta_boxes = do_meta_boxes( 'object', 'side', $object );
-
-			?>
+				<div class="postbox" id="submitdiv">
+					<h3 class="wplc_plaincursor">
+						<span><?php _e('Publish', $wplc_domain); ?></span>
+					</h3>
+					<div class="inside">
+						<?php object_submit_meta_box(); ?>
+					</div>
+				</div>
 			</div>
 			
 			<div id="post-body">
-			<div id="post-body-content">
-			<div id="namediv" class="stuffbox">
-			<h3><label for="link_name"><?php _e('Name') ?></label></h3>
-			<div class="inside">
-				<input type="text" name="link_name" size="30" tabindex="1" value="<?php echo esc_attr($object->object_name); ?>" id="link_name" />
-			    <p><?php _e('Example: Nifty blogging software'); ?></p>
+				<div id="post-body-content">
+					<div id="titlediv">
+						<div id="titlewrap">
+							<label class="screen-reader-text" for="title"><?php _e('Title') ?></label>
+							<input type="text" name="post_title" size="30" tabindex="1" value="<?php echo esc_attr( htmlspecialchars( $object->object_title ) ); ?>" id="title" autocomplete="off" />			
+						</div>
+					</div>
+				</div>
 			</div>
-			</div>
-			</div>
-			<?php object_submit_meta_box(); ?>
-			
 
 		</div>
 <?php
@@ -101,7 +96,7 @@ function object_edit_page() {
 }
 
 function object_new_page() {
-	object_edit_formt();
+	object_edit_form();
 }
 
 function object_admin_pages() {
