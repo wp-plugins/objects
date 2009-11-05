@@ -8,6 +8,34 @@ Author URI: http://www.frankieroberto.com
 Tags: museums, collection, objects
 */
 
+// Plugin DB Installation
+function objects_install() {
+#	get_currentuserinfo();
+	
+	global $wpdb;
+	$table_name = $wpdb->prefix."objects";
+
+	// Check if DB exists and add it if necessary
+	if($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+		$sql = "CREATE TABLE ".$table_name."(
+			ID bigint(9) NOT NULL AUTO_INCREMENT,
+			object_title text NOT NULL,
+			object_content longtext NOT NULL,
+			object_date datetime NOT NULL,
+			object_modified datetime NOT NULL,
+			object_name varchar(200) NOT NULL,
+			object_status varchar(20) NOT NULL,
+			PRIMARY KEY  id (id)
+		);";
+	
+		require_once(ABSPATH.'wp-admin/upgrade-functions.php');
+		dbDelta($sql);
+		echo("test");
+	}
+
+}
+register_activation_hook(__FILE__, "objects_install");
+
 function object_submit_meta_box($object) {
 ?>
 	<div class="submitbox" id="submitlink">
@@ -186,24 +214,26 @@ function object_tags_meta_box($object, $box) {
 
 
 function object_edit_form() {
-		if ( !empty($object_id) ) {
-			$heading = sprintf( __( '<a href="%s">Links</a> / Edit Link' ), 'link-manager.php' );
-			$submit_text = __('Update Link');
-			$form = '<form name="editlink" id="editlink" method="post" action="link.php">';
-			$nonce_action = 'update-bookmark_' . $link_id;
-		} else {
-	#		$heading = sprintf( __( '<a href="%s">Links</a> / Add New Link' ), 'link-manager.php' );
-			$submit_text = __('Add Object');
-			$form = '<form name="addobject" id="addobject" method="post" action="add-object.php">';
-			$nonce_action = 'add-object';
-		}
+	global $wpdb;
+	if (isset($_GET['id'])) {
+		$id = $_GET['id'];
+		
+		$sql = "SELECT * "
+		."FROM " . $wpdb->prefix."objects"
+		." WHERE ID=".$wpdb->escape($id) .";";
+		$objects = $wpdb->get_results($sql, ARRAY_A);
+		$object = $objects[0];
+		$object_id = $object['ID'];
 
+	}
+	get_currentuserinfo();
+	global $user_ID;	
 
 ?> 
 
 
 		<div class="wrap">
-			<h2>Add New Object</h2>
+			<h2><?php echo $object_id ? __("Edit Event") : __("Add New Object"); ?></h2>
 			
 			<form name="object" action="" method="post" id="post">
 			
@@ -224,12 +254,13 @@ function object_edit_form() {
 							<div id="titlediv">
 								<div id="titlewrap">
 									<label class="screen-reader-text" for="title"><?php _e('Title') ?></label>
-									<input type="text" name="post_title" size="30" tabindex="1" value="<?php echo esc_attr( htmlspecialchars( $object->object_title ) ); ?>" id="title" autocomplete="off" />			
+									<input type="text" name="post_title" size="30" tabindex="1" value="<?php echo esc_attr( htmlspecialchars( $object['object_title'] ) ); ?>" id="title" autocomplete="off" />			
 								</div>
 							</div>
 							
-							<div id="<?php echo user_can_richedit() ? 'postdivrich' : 'postdiv'; ?>" class="postarea">
-								<?php the_editor($object->$object_body); ?>
+							<div id="postdivrich" class="postarea">
+								<?php the_editor($object['object_content'], "content", "titlediv", true); ?>
+
 								<table id="post-status-info" cellspacing="0">
 									<tbody>
 										<tr>
@@ -260,7 +291,22 @@ function object_edit_form() {
 }
 
 function object_edit_page() {
+	global $wpdb;
 	$title = "Edit Objects";
+
+	// Check how many objects there are
+	$sql = "SELECT ID FROM ".$wpdb->prefix."objects";
+	$wpdb->query($sql);
+	$totalobjects = $wpdb->num_rows;
+
+	// Get objects for this page
+	$sql = "SELECT id, object_title, object_name, object_status"
+		 ." FROM ".$wpdb->prefix."objects"
+		 ." ORDER BY object_date DESC";
+		$wpdb->show_errors();
+	$objects = $wpdb->get_results($sql, ARRAY_A);
+	
+	
 	?>
 	<div class="wrap">
 		<?php # screen_icon(); ?>
@@ -300,7 +346,7 @@ function object_edit_page() {
 				'format' => '',
 				'prev_text' => __('&laquo;'),
 				'next_text' => __('&raquo;'),
-				'total' => 10,
+				'total' => $totalobjects,
 				'current' => $_GET['paged']
 			));
 
@@ -335,15 +381,36 @@ function object_edit_page() {
 				</tfoot>
 
 				<tbody>
-
-					<tr id="object-1">
+					<?php
+					foreach($objects as $object) {
+						$class = $i % 2 == 0 ? " class='alternate'" : "";
+					?>
+					<tr id="object-<?php echo $objects['id']; ?>">
 						<th scope="row" class="check-column"><input type="checkbox" name="object[]" value="1" /></th>
-						<td><a href="" class="row-title">Example name</a>
-							<div class="row-actions"><a href="" class="edit"><?php _e("Edit"); ?></a> | <a href="" onclick="" class="submitdelete"><?php _e("Delete"); ?></a></div>
+						<td><a href="admin.php?page=object-edit&amp;id=<?php echo  $object['id'] ?>" class="row-title"><?php echo $object['object_title']; ?></a>
+							
+							<?php $actions = array();
+								$actions['edit'] = '<a href="admin.php?page=object-edit&id=' . $object['id'] . '" title="' . esc_attr(__('Edit this post')) . '">' . __('Edit') . '</a>';
+								$actions['delete'] = "<a class='submitdelete' title='" . esc_attr(__('Delete this post')) . "' href='" . wp_nonce_url("post.php?action=delete&amp;post=".$object['id'], 'delete-post_' . $object['id']) . "' onclick=\"if ( confirm('" . esc_js(sprintf(__("You are about to delete the object '%s'\n 'Cancel' to stop, 'OK' to delete."), $object['object_title'] )) . "') ) { return true;}return false;\">" . __('Delete') . "</a>";
+							
+
+								$actions = apply_filters('post_row_actions', $actions, $post);
+								$action_count = count($actions);
+								$j = 0;
+								echo '<div class="row-actions">';
+								foreach ( $actions as $action => $link ) {
+									++$j;
+									( $j == $action_count ) ? $sep = '' : $sep = ' | ';
+									echo "<span class='$action'>$link$sep</span>";
+								}
+								echo '</div>';
+							
+							?>
+							
 						</td>
 						<td>2009-11</td>
 					</tr>
-
+					<?php } ?>
 				</tbody>
 			</table>
 		</div>
@@ -359,7 +426,7 @@ function object_new_page() {
 function object_admin_pages() {
 	add_object_page(__("Object"), __("Objects"), 2, plugin_basename(__FILE__), "object_edit_page");
 	add_submenu_page(plugin_basename(__FILE__), __("Edit"), __("Edit"), 2, "objects/objects.php", "object_edit_page", plugin_basename(__FILE__));
-	add_submenu_page(plugin_basename(__FILE__), __("Add New"), __("Add New"), 2, "object-new", "object_new_page");
+	add_submenu_page(plugin_basename(__FILE__), __("Add New"), __("Add New"), 2, "object-edit", "object_new_page");
 
 	add_meta_box('pagesubmitdiv', __('Save'), 'object_submit_meta_box', 'object', 'side', 'core');
 	
@@ -382,7 +449,12 @@ function object_admin_pages() {
 }
 
 
+
 add_action('admin_menu', 'object_admin_pages');
+
+
+
+#add_action('activate_objects', "objects_install");
 
 
 
