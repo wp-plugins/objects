@@ -235,7 +235,7 @@ function object_edit_form() {
 		<div class="wrap">
 			<h2><?php echo $object_id ? __("Edit Event") : __("Add New Object"); ?></h2>
 			
-			<form name="object" action="" method="post" id="post">
+			<form name="object" action="admin.php?page=object-edit" method="post" id="post">
 			
 				<div id="poststuff" class="metabox-holder has-right-sidebar">
 
@@ -254,7 +254,7 @@ function object_edit_form() {
 							<div id="titlediv">
 								<div id="titlewrap">
 									<label class="screen-reader-text" for="title"><?php _e('Title') ?></label>
-									<input type="text" name="post_title" size="30" tabindex="1" value="<?php echo esc_attr( htmlspecialchars( $object['object_title'] ) ); ?>" id="title" autocomplete="off" />			
+									<input type="text" name="object_title" size="30" tabindex="1" value="<?php echo esc_attr( htmlspecialchars( $object['object_title'] ) ); ?>" id="title" autocomplete="off" />			
 								</div>
 							</div>
 							
@@ -294,6 +294,12 @@ function object_edit_page() {
 	global $wpdb;
 	$title = "Edit Objects";
 
+	if($_GET['action'] == "delete") {
+		object_delete_object($_GET['id']);
+		return;
+		echo("deleted");
+	}
+
 	// Check how many objects there are
 	$sql = "SELECT ID FROM ".$wpdb->prefix."objects";
 	$wpdb->query($sql);
@@ -316,12 +322,12 @@ function object_edit_page() {
 		<ul class="subsubsub">
 		<?php
 			$status_links = array();
-			$num_posts = 100;
+			$num_posts = $totalobjects;
 			$total_posts = array_sum( (array) $num_posts );
 			$class = empty( $_GET['object_status'] ) ? ' class="current"' : '';
-			$status_links[] = "<li><a href='edit.php' $class>" . sprintf( _nx( 'All <span class="count">(%s)</span>', 'All <span class="count">(%s)</span>', $total_posts, 'posts' ), number_format_i18n( $total_posts ) ) . '</a>';
+			$status_links[] = "<li><a href='admin.php?page=objects/objects.php' $class>" . sprintf( _nx( 'All <span class="count">(%s)</span>', 'All <span class="count">(%s)</span>', $total_posts, 'posts' ), number_format_i18n( $total_posts ) ) . '</a>';
 
-			$status_links[] = "<li><a href='edit.php?post_status=draft'>" . sprintf( _n("Draft", "Drafts", 10), number_format_i18n(10) ) . '</a>';
+			$status_links[] = "<li><a href='admin.php?page=objects/objects.php&amp;post_status=draft'>" . sprintf( _n("Draft", "Drafts", 10), number_format_i18n(10) ) . '</a>';
 			
 
 			echo implode( " |</li>\n", $status_links ) . '</li>';
@@ -362,6 +368,7 @@ function object_edit_page() {
 			</div>
 			<?php } ?>
 			
+			<?php if ($objects) : ?>
 			<table class="widefat post fixed" cellspacing="0">
 				<thead>
 					<tr>
@@ -391,7 +398,7 @@ function object_edit_page() {
 							
 							<?php $actions = array();
 								$actions['edit'] = '<a href="admin.php?page=object-edit&id=' . $object['id'] . '" title="' . esc_attr(__('Edit this post')) . '">' . __('Edit') . '</a>';
-								$actions['delete'] = "<a class='submitdelete' title='" . esc_attr(__('Delete this post')) . "' href='" . wp_nonce_url("post.php?action=delete&amp;post=".$object['id'], 'delete-post_' . $object['id']) . "' onclick=\"if ( confirm('" . esc_js(sprintf(__("You are about to delete the object '%s'\n 'Cancel' to stop, 'OK' to delete."), $object['object_title'] )) . "') ) { return true;}return false;\">" . __('Delete') . "</a>";
+								$actions['delete'] = "<a class='submitdelete' title='" . esc_attr(__('Delete this post')) . "' href='" . wp_nonce_url("admin.php?page=objects/objects.php&amp;action=delete&amp;id=".$object['id'], 'delete-post_' . $object['id']) . "' onclick=\"if ( confirm('" . esc_js(sprintf(__("You are about to delete the object '%s'\n 'Cancel' to stop, 'OK' to delete."), $object['object_title'] )) . "') ) { return true;}return false;\">" . __('Delete') . "</a>";
 							
 
 								$actions = apply_filters('post_row_actions', $actions, $post);
@@ -413,6 +420,7 @@ function object_edit_page() {
 					<?php } ?>
 				</tbody>
 			</table>
+			<?php endif; ?>
 		</div>
 	
 	</div>
@@ -420,6 +428,10 @@ function object_edit_page() {
 }
 
 function object_new_page() {
+	if ($_POST['object_title']) {
+		object_process_object($_POST);		
+	}
+	
 	object_edit_form();
 }
 
@@ -448,6 +460,49 @@ function object_admin_pages() {
 	
 }
 
+function object_process_object($postvars) {
+	global $wpdb, $current_user;
+	
+	$object_title = addslashes($postvars['object_title']);
+	$object_content = addslashes($postvars['content']);
+	
+	$tbl_name = $wpdb->prefix."objects";
+
+	if(empty($postvars['id'])) {
+		$insert = "INSERT INTO ".$tbl_name.
+				  " (object_title, object_content, object_date, object_modified) ".
+				  "VALUES('".$wpdb->escape($object_title)."',
+				  		'".$wpdb->escape($object_content)."',
+						  '".$wpdb->escape($create_mod_time)."',
+						  '".$wpdb->escape($create_mod_time)."');";
+		$results = $wpdb->query($insert);
+	}
+	else {
+		$update = "UPDATE ".$tbl_name.
+			  	  " SET event_name='".$wpdb->escape($name)."',".
+				  "event_link='".$wpdb->escape($link)."',".
+				  "event_loc='".$wpdb->escape($location)."',".
+				  "event_desc='".$wpdb->escape($description)."',".
+				  "event_start_time='".$wpdb->escape($start)."',".
+				  "event_end_time='".$wpdb->escape($end)."',".
+				  "event_allday=".$wpdb->escape($allday ? '1' : '0').",".
+				  "event_modified_time='".$wpdb->escape($create_mod_time)."' ".
+				  "WHERE id=".$wpdb->escape($postvars['id']);
+		$results = $wpdb->query($update);
+	}	
+}
+
+function object_delete_object($id=null) {
+	global $wpdb;
+	
+	if($id == null)
+		$id = $wpdb->escape($_POST['id']);
+		
+	$tbl_name = $wpdb->prefix."objects";
+	
+	$sql = "DELETE FROM ".$tbl_name." WHERE id=".$id;
+	$wpdb->query($sql);
+}
 
 
 add_action('admin_menu', 'object_admin_pages');
