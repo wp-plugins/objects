@@ -33,10 +33,15 @@ function objects_install() {
 		dbDelta($sql);
 //	}
 
-//	add_rewrite_rule("/objects\d+/", "index.php?object=1", 'top');
 
 }
 register_activation_hook(__FILE__, "objects_install");
+
+function add_object_urls() {
+	add_rewrite_rule('(collection)/([0-9]+)$', 'index.php?object_id=$matches[1]');
+  add_rewrite_tag('%object_id%', '[0-9]+');	
+}
+add_action('init', 'add_object_urls');
 
 function object_submit_meta_box($object) {
 ?>
