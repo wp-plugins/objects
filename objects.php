@@ -16,7 +16,7 @@ function objects_install() {
 	$table_name = $wpdb->prefix."objects";
 
 	// Check if DB exists and add it if necessary
-	if($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+//	if($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
 		$sql = "CREATE TABLE ".$table_name."(
 			ID bigint(9) NOT NULL AUTO_INCREMENT,
 			object_title text NOT NULL,
@@ -25,13 +25,15 @@ function objects_install() {
 			object_modified datetime NOT NULL,
 			object_name varchar(200) NOT NULL,
 			object_status varchar(20) NOT NULL,
+			comment_status varchar(20) NOT NULL,
 			PRIMARY KEY  id (id)
 		);";
 	
 		require_once(ABSPATH.'wp-admin/upgrade-functions.php');
 		dbDelta($sql);
-		echo("test");
-	}
+//	}
+
+//	add_rewrite_rule("/objects\d+/", "index.php?object=1", 'top');
 
 }
 register_activation_hook(__FILE__, "objects_install");
@@ -164,13 +166,21 @@ function object_submit_meta_box($object) {
 			
 		<div id="major-publishing-actions">
 			<?php do_action('post_submitbox_start'); ?>
+				<div id="delete-action">
+				<?php
+				if (!empty($object)) { ?>
+				<a class="submitdelete deletion" href="<?php echo wp_nonce_url("admin.php?page=objects/objects.php&amp;action=delete&amp;id=".$object['ID'], 'delete-post_' . $object['ID']); ?>" onclick="if ( confirm('You are about to delete this object. OK?') ) {return true;}return false;">
 
+				
+				<?php _e('Delete'); ?></a>
+				<?php } ?>
+				</div>
 
 			<div id="publishing-action">
-			<?php if ( !empty($link->link_id) ) { ?>
+			<?php if ( !empty($object) ) { ?>
 				<input name="save" type="submit" class="button-primary" id="publish" tabindex="4" accesskey="p" value="<?php esc_attr_e('Update Object') ?>" />
 			<?php } else { ?>
-				<input name="save" type="submit" class="button-primary" id="publish" tabindex="4" accesskey="p" value="<?php esc_attr_e('Add Object') ?>" />
+				<input name="save" type="submit" class="button-primary" id="publish" tabindex="4" accesskey="p" value="<?php esc_attr_e('Publish Object') ?>" />
 			<?php } ?>
 			</div>
 
@@ -214,9 +224,16 @@ function object_tags_meta_box($object, $box) {
 
 
 function object_edit_form() {
-	global $wpdb;
+	global $wpdb; 
+	global $id;
 	if (isset($_GET['id'])) {
 		$id = $_GET['id'];
+	} elseif (isset($_POST['id'])) {
+		$id = $_POST['id'];
+		$message = "Object updated.";
+	}	
+	
+	if (isset($id)) {
 		
 		$sql = "SELECT * "
 		."FROM " . $wpdb->prefix."objects"
@@ -230,12 +247,26 @@ function object_edit_form() {
 	global $user_ID;	
 
 ?> 
-
+<?php
+if(!is_null($message)) {
+?>
+	<div id="message" class="updated fade">
+		<p>
+			<?php echo $message; ?>
+		</p>
+	</div>
+<?php
+}
+?>
 
 		<div class="wrap">
 			<h2><?php echo $object_id ? __("Edit Event") : __("Add New Object"); ?></h2>
 			
 			<form name="object" action="admin.php?page=object-edit" method="post" id="post">
+				<?php if(!empty($object_id)) { ?>
+					<input type="hidden" name="id" value="<?php echo $object_id; ?>" />
+				<?php	}	?>
+
 			
 				<div id="poststuff" class="metabox-holder has-right-sidebar">
 
@@ -255,6 +286,14 @@ function object_edit_form() {
 								<div id="titlewrap">
 									<label class="screen-reader-text" for="title"><?php _e('Title') ?></label>
 									<input type="text" name="object_title" size="30" tabindex="1" value="<?php echo esc_attr( htmlspecialchars( $object['object_title'] ) ); ?>" id="title" autocomplete="off" />			
+								</div>
+								<div class="inside">
+									<div id="edit-slug-box">
+										<strong>Permalink:</strong>
+										<span id="sample-permalink">
+											http://www.blah.com/objects/<?php echo $object['object_name']; ?>
+										</span>
+									</div>
 								</div>
 							</div>
 							
@@ -415,7 +454,7 @@ function object_edit_page() {
 							?>
 							
 						</td>
-						<td>2009-11</td>
+						<td><?php echo $object['object_name']; ?></td>
 					</tr>
 					<?php } ?>
 				</tbody>
@@ -479,16 +518,14 @@ function object_process_object($postvars) {
 	}
 	else {
 		$update = "UPDATE ".$tbl_name.
-			  	  " SET event_name='".$wpdb->escape($name)."',".
-				  "event_link='".$wpdb->escape($link)."',".
-				  "event_loc='".$wpdb->escape($location)."',".
-				  "event_desc='".$wpdb->escape($description)."',".
-				  "event_start_time='".$wpdb->escape($start)."',".
-				  "event_end_time='".$wpdb->escape($end)."',".
-				  "event_allday=".$wpdb->escape($allday ? '1' : '0').",".
-				  "event_modified_time='".$wpdb->escape($create_mod_time)."' ".
+			  	  " SET object_title='".$wpdb->escape($object_title)."',".
+				  "object_content='".$wpdb->escape($object_content)."',".
+				  "object_modified='".$wpdb->escape($create_mod_time)."' ".
 				  "WHERE id=".$wpdb->escape($postvars['id']);
 		$results = $wpdb->query($update);
+		
+		$id = $wpdb->insert_id;
+		
 	}	
 }
 
