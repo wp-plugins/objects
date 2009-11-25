@@ -226,9 +226,21 @@ function object_tags_meta_box($object, $box) {
 <?php
 }
 
-
+function object_comments_status_meta_box($object){
+?>
+<input name="advanced_view" type="hidden" value="1" />
+<p><label for="comment_status" class="selectit">
+<input name="comment_status" type="checkbox" id="comment_status" value="open" <?php checked($object['comment_status'], 'open'); ?> />
+<?php _e('Allow Comments') ?></label></p>
+<p><?php _e('These settings apply to this object only.'); ?></p>
+<?php
+}
 
 function object_edit_form() {
+	wp_print_scripts('editor');
+	if(function_exists('wp_tiny_mce')) wp_tiny_mce();
+	
+	
 	global $wpdb; 
 	global $id;
 	if (isset($_GET['id'])) {
@@ -303,7 +315,8 @@ if(!is_null($message)) {
 							</div>
 							
 							<div id="postdivrich" class="postarea">
-								<?php the_editor($object['object_content'], "content", "titlediv", true); ?>
+								<?php #the_editor(, "content", "titlediv", true); ?>
+								<?php the_editor(stripslashes(stripslashes($object['object_content'])) /*content*/, "content" /*id*/, "sample-permalink" /*prev_id*/, true /*media_buttons*/, 15 /*tab_index*/); ?>
 
 								<table id="post-status-info" cellspacing="0">
 									<tbody>
@@ -323,6 +336,8 @@ if(!is_null($message)) {
 								wp_nonce_field( 'samplepermalink', 'samplepermalinknonce', false );
 								wp_nonce_field( 'meta-box-order', 'meta-box-order-nonce', false ); ?>
 							</div>							
+							
+							<?php do_meta_boxes('object', 'normal', $object); ?>
 							
 						</div>
 					</div>
@@ -485,6 +500,7 @@ function object_admin_pages() {
 	add_submenu_page(plugin_basename(__FILE__), __("Add New"), __("Add New"), 2, "object-edit", "object_new_page");
 
 	add_meta_box('pagesubmitdiv', __('Save'), 'object_submit_meta_box', 'object', 'side', 'core');
+	add_meta_box('pagecommentstatusdiv', __('Discussion'), 'object_comments_status_meta_box', 'object', 'normal', 'core');
 	
 	do_action('do_meta_boxes', 'object', 'normal');
 	do_action('do_meta_boxes', 'object', 'advanced');
@@ -507,16 +523,23 @@ function object_admin_pages() {
 function object_process_object($postvars) {
 	global $wpdb, $current_user;
 	
+	
+	if (!empty($postvars['comment_status'])) { 
+		$comment_status = addslashes($postvars['comment_status']);
+	 } else { $comment_status = 'closed';}
+	
 	$object_title = addslashes($postvars['object_title']);
 	$object_content = addslashes($postvars['content']);
+	
 	
 	$tbl_name = $wpdb->prefix."objects";
 
 	if(empty($postvars['id'])) {
 		$insert = "INSERT INTO ".$tbl_name.
-				  " (object_title, object_content, object_date, object_modified) ".
+				  " (object_title, object_content, comment_status, object_date, object_modified) ".
 				  "VALUES('".$wpdb->escape($object_title)."',
 				  		'".$wpdb->escape($object_content)."',
+						  '".$wpdb->escape($comment_status)."',						
 						  '".$wpdb->escape($create_mod_time)."',
 						  '".$wpdb->escape($create_mod_time)."');";
 		$results = $wpdb->query($insert);
@@ -525,6 +548,7 @@ function object_process_object($postvars) {
 		$update = "UPDATE ".$tbl_name.
 			  	  " SET object_title='".$wpdb->escape($object_title)."',".
 				  "object_content='".$wpdb->escape($object_content)."',".
+				  "comment_status='".$wpdb->escape($comment_status)."',".
 				  "object_modified='".$wpdb->escape($create_mod_time)."' ".
 				  "WHERE id=".$wpdb->escape($postvars['id']);
 		$results = $wpdb->query($update);
