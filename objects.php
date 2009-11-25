@@ -1,6 +1,6 @@
 <?php
 /*
-Plugin Name: Objects
+Plugin Name: Object Collections
 Description: Manage your object collection with Wordpress
 Version: 0.1
 Author: Frankie Roberto
