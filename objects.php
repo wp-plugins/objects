@@ -20,6 +20,8 @@ function add_physical_object_type() {
 	add_rewrite_rule('(collection)/([0-9]+)$', 'index.php?object_id=$matches[1]');
   add_rewrite_tag('%object_id%', '[0-9]+');	
 	register_post_type( 'physical-object', array('exclude_from_search' => false) );
+	register_taxonomy( 'object_tag', 'physical-object', array('hierarchical' => false, 'label' => __('Object Tags'), 'query_var' => true, 'rewrite' => true) ) ;
+	
 
 }
 add_action('init', 'add_physical_object_type');
@@ -218,7 +220,15 @@ function object_comments_status_meta_box($object){
 }
 
 function object_edit_form() {
-	wp_print_scripts('editor');
+
+	wp_print_scripts('autosave');
+	wp_print_scripts('post');
+	if ( user_can_richedit() )
+		wp_print_scripts('editor');
+	add_thickbox();
+	wp_print_scripts('media-upload');
+	wp_print_scripts('word-count');
+	
 	if(function_exists('wp_tiny_mce')) wp_tiny_mce();
 	
 	
@@ -239,6 +249,19 @@ function object_edit_form() {
 	}
 	get_currentuserinfo();
 	global $user_ID;	
+	
+	
+	require_once('includes/meta-boxes.php');
+	
+	// all tag-style post taxonomies
+	foreach ( get_object_taxonomies('physical-object') as $tax_name ) {
+		if ( !is_taxonomy_hierarchical($tax_name) ) {
+			$taxonomy = get_taxonomy($tax_name);
+			$label = isset($taxonomy->label) ? esc_attr($taxonomy->label) : $tax_name;
+
+			add_meta_box('tagsdiv-' . $tax_name, $label, 'post_tags_meta_box', 'object', 'side', 'core');
+		}
+	}
 
 ?> 
 <?php
@@ -503,6 +526,8 @@ function object_admin_pages() {
 
 	add_meta_box('pagesubmitdiv', __('Save'), 'object_submit_meta_box', 'object', 'side', 'core');
 	add_meta_box('pagecommentstatusdiv', __('Discussion'), 'object_comments_status_meta_box', 'object', 'normal', 'core');
+	add_meta_box('postthumbnaildiv', __('Object Image'), 'post_thumbnail_meta_box', 'object', 'side', 'low');
+
 	
 	do_action('do_meta_boxes', 'object', 'normal');
 	do_action('do_meta_boxes', 'object', 'advanced');
@@ -515,7 +540,6 @@ function object_admin_pages() {
 			$label = isset($taxonomy->label) ? esc_attr($taxonomy->label) : $tax_name;
 			$label = "Object Tags";
 
-			add_meta_box('tagsdiv-' . $tax_name, $label, 'object_tags_meta_box', 'object', 'side', 'core');
 		}
 	}
 	
