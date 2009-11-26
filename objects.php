@@ -305,12 +305,17 @@ if(!is_null($message)) {
 									<input type="text" name="object_title" size="30" tabindex="1" value="<?php echo esc_attr( htmlspecialchars( $object->post_title ) ); ?>" id="title" autocomplete="off" />			
 								</div>
 								<div class="inside">
+								<?php
+								$sample_permalink_html = get_sample_permalink_html($object->ID);
+								if ( !( 'pending' == $object->post_status && !current_user_can( 'publish_posts' ) ) ) { ?>
 									<div id="edit-slug-box">
-										<strong>Permalink:</strong>
-										<span id="sample-permalink">
-											http://www.blah.com/objects/<?php echo $object->post_name; ?>
-										</span>
+								<?php
+									if ( ! empty($object->ID) && ! empty($sample_permalink_html) ) :
+										echo $sample_permalink_html;
+								endif; ?>
 									</div>
+								<?php
+								} ?>
 								</div>
 							</div>
 							
@@ -345,6 +350,7 @@ if(!is_null($message)) {
 				</div>
 			</form>
 		</div>	
+
 <?php
 	
 }
@@ -524,8 +530,10 @@ function object_admin_pages() {
 	add_submenu_page(plugin_basename(__FILE__), __("Edit"), __("Edit"), 2, "objects/objects.php", "object_edit_page", plugin_basename(__FILE__));
 	add_submenu_page(plugin_basename(__FILE__), __("Add New"), __("Add New"), 2, "object-edit", "object_new_page");
 
-	add_meta_box('pagesubmitdiv', __('Save'), 'object_submit_meta_box', 'object', 'side', 'core');
-	add_meta_box('pagecommentstatusdiv', __('Discussion'), 'object_comments_status_meta_box', 'object', 'normal', 'core');
+	add_meta_box('pagesubmitdiv', __('Save'), 'post_submit_meta_box', 'object', 'side', 'core');
+
+	add_meta_box('commentstatusdiv', __('Discussion'), 'post_comment_status_meta_box', 'object', 'normal', 'core');
+	
 	add_meta_box('postthumbnaildiv', __('Object Image'), 'post_thumbnail_meta_box', 'object', 'side', 'low');
 
 	
