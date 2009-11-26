@@ -8,40 +8,21 @@ Author URI: http://www.frankieroberto.com
 Tags: museums, collection, objects
 */
 
-// Plugin DB Installation
+// Plugin Installation
 function objects_install() {
-#	get_currentuserinfo();
-	
-	global $wpdb;
-	$table_name = $wpdb->prefix."objects";
 
-	// Check if DB exists and add it if necessary
-//	if($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
-		$sql = "CREATE TABLE ".$table_name."(
-			ID bigint(9) NOT NULL AUTO_INCREMENT,
-			object_title text NOT NULL,
-			object_content longtext NOT NULL,
-			object_date datetime NOT NULL,
-			object_modified datetime NOT NULL,
-			object_name varchar(200) NOT NULL,
-			object_status varchar(20) NOT NULL,
-			comment_status varchar(20) NOT NULL,
-			PRIMARY KEY  id (id)
-		);";
-	
-		require_once(ABSPATH.'wp-admin/upgrade-functions.php');
-		dbDelta($sql);
-//	}
 
 
 }
 register_activation_hook(__FILE__, "objects_install");
 
-function add_object_urls() {
+function add_physical_object_type() {
 	add_rewrite_rule('(collection)/([0-9]+)$', 'index.php?object_id=$matches[1]');
   add_rewrite_tag('%object_id%', '[0-9]+');	
+	register_post_type( 'physical-object', array('exclude_from_search' => false) );
+
 }
-add_action('init', 'add_object_urls');
+add_action('init', 'add_physical_object_type');
 
 function object_submit_meta_box($object) {
 ?>
@@ -174,7 +155,7 @@ function object_submit_meta_box($object) {
 				<div id="delete-action">
 				<?php
 				if (!empty($object)) { ?>
-				<a class="submitdelete deletion" href="<?php echo wp_nonce_url("admin.php?page=objects/objects.php&amp;action=delete&amp;id=".$object['ID'], 'delete-post_' . $object['ID']); ?>" onclick="if ( confirm('You are about to delete this object. OK?') ) {return true;}return false;">
+				<a class="submitdelete deletion" href="<?php echo wp_nonce_url("admin.php?page=objects/objects.php&amp;action=delete&amp;id=".$object->ID, 'delete-post_' . $object->ID); ?>" onclick="if ( confirm('You are about to delete this object. OK?') ) {return true;}return false;">
 
 				
 				<?php _e('Delete'); ?></a>
@@ -230,7 +211,7 @@ function object_comments_status_meta_box($object){
 ?>
 <input name="advanced_view" type="hidden" value="1" />
 <p><label for="comment_status" class="selectit">
-<input name="comment_status" type="checkbox" id="comment_status" value="open" <?php checked($object['comment_status'], 'open'); ?> />
+<input name="comment_status" type="checkbox" id="comment_status" value="open" <?php checked($object->comment_status, 'open'); ?> />
 <?php _e('Allow Comments') ?></label></p>
 <p><?php _e('These settings apply to this object only.'); ?></p>
 <?php
@@ -252,12 +233,8 @@ function object_edit_form() {
 	
 	if (isset($id)) {
 		
-		$sql = "SELECT * "
-		."FROM " . $wpdb->prefix."objects"
-		." WHERE ID=".$wpdb->escape($id) .";";
-		$objects = $wpdb->get_results($sql, ARRAY_A);
-		$object = $objects[0];
-		$object_id = $object['ID'];
+		$object = get_post($id);
+		$object_id = $object->ID;
 
 	}
 	get_currentuserinfo();
@@ -302,13 +279,13 @@ if(!is_null($message)) {
 							<div id="titlediv">
 								<div id="titlewrap">
 									<label class="screen-reader-text" for="title"><?php _e('Title') ?></label>
-									<input type="text" name="object_title" size="30" tabindex="1" value="<?php echo esc_attr( htmlspecialchars( $object['object_title'] ) ); ?>" id="title" autocomplete="off" />			
+									<input type="text" name="object_title" size="30" tabindex="1" value="<?php echo esc_attr( htmlspecialchars( $object->post_title ) ); ?>" id="title" autocomplete="off" />			
 								</div>
 								<div class="inside">
 									<div id="edit-slug-box">
 										<strong>Permalink:</strong>
 										<span id="sample-permalink">
-											http://www.blah.com/objects/<?php echo $object['object_name']; ?>
+											http://www.blah.com/objects/<?php echo $object->post_name; ?>
 										</span>
 									</div>
 								</div>
@@ -316,7 +293,7 @@ if(!is_null($message)) {
 							
 							<div id="postdivrich" class="postarea">
 								<?php #the_editor(, "content", "titlediv", true); ?>
-								<?php the_editor(stripslashes(stripslashes($object['object_content'])) /*content*/, "content" /*id*/, "sample-permalink" /*prev_id*/, true /*media_buttons*/, 15 /*tab_index*/); ?>
+								<?php the_editor(stripslashes(stripslashes($object->post_content)) /*content*/, "content" /*id*/, "sample-permalink" /*prev_id*/, true /*media_buttons*/, 15 /*tab_index*/); ?>
 
 								<table id="post-status-info" cellspacing="0">
 									<tbody>
@@ -359,40 +336,62 @@ function object_edit_page() {
 		echo("deleted");
 	}
 
-	// Check how many objects there are
-	$sql = "SELECT ID FROM ".$wpdb->prefix."objects";
-	$wpdb->query($sql);
-	$totalobjects = $wpdb->num_rows;
+	wp_enqueue_script('inline-edit-post');
+	$post_stati  = array(	//	array( adj, noun )
+			'publish' => array(_x('Published', 'page'), __('Published pages'), _nx_noop('Published <span class="count">(%s)</span>', 'Published <span class="count">(%s)</span>', 'page')),
+			'future' => array(_x('Scheduled', 'page'), __('Scheduled pages'), _nx_noop('Scheduled <span class="count">(%s)</span>', 'Scheduled <span class="count">(%s)</span>', 'page')),
+			'pending' => array(_x('Pending Review', 'page'), __('Pending pages'), _nx_noop('Pending Review <span class="count">(%s)</span>', 'Pending Review <span class="count">(%s)</span>', 'page')),
+			'draft' => array(_x('Draft', 'page'), _x('Drafts', 'manage posts header'), _nx_noop('Draft <span class="count">(%s)</span>', 'Drafts <span class="count">(%s)</span>', 'page')),
+			'private' => array(_x('Private', 'page'), __('Private pages'), _nx_noop('Private <span class="count">(%s)</span>', 'Private <span class="count">(%s)</span>', 'page')),
+			'trash' => array(_x('Trash', 'page'), __('Trash pages'), _nx_noop('Trash <span class="count">(%s)</span>', 'Trash <span class="count">(%s)</span>', 'page'))
+		);
 
-	// Get objects for this page
-	$sql = "SELECT id, object_title, object_name, object_status"
-		 ." FROM ".$wpdb->prefix."objects"
-		 ." ORDER BY object_date DESC";
-		$wpdb->show_errors();
-	$objects = $wpdb->get_results($sql, ARRAY_A);
-	
+	if ( !EMPTY_TRASH_DAYS )
+		unset($post_stati['trash']);
+
+	$post_stati = apply_filters('page_stati', $post_stati);
+	$totalobjects = wp_count_posts('page');
+
+	if ( isset( $_GET['post_status'] )) {
+		$post_status = $_GET['post_status'];
+	}	else {
+		$post_status = 'all';
+	}
+
+	$objects = get_posts( array('post_type' => 'physical-object', 'numberposts' => 20, 'post_status' => $post_status));
+
 	
 	?>
 	<div class="wrap">
 		<?php # screen_icon(); ?>
 		<h2><?php echo esc_html( $title ); ?></h2>
-	
-	
 		<ul class="subsubsub">
 		<?php
-			$status_links = array();
-			$num_posts = $totalobjects;
-			$total_posts = array_sum( (array) $num_posts );
-			$class = empty( $_GET['object_status'] ) ? ' class="current"' : '';
-			$status_links[] = "<li><a href='admin.php?page=objects/objects.php' $class>" . sprintf( _nx( 'All <span class="count">(%s)</span>', 'All <span class="count">(%s)</span>', $total_posts, 'posts' ), number_format_i18n( $total_posts ) ) . '</a>';
 
-			$status_links[] = "<li><a href='admin.php?page=objects/objects.php&amp;post_status=draft'>" . sprintf( _n("Draft", "Drafts", 10), number_format_i18n(10) ) . '</a>';
-			
+		$avail_post_stati = get_available_post_statuses('physical-object');
+		if ( empty($locked_post_status) ) :
+		$status_links = array();
+		$num_posts = wp_count_posts('physical-object', 'readable');
+		$total_posts = array_sum( (array) $num_posts ) - $num_posts->trash;
+		$class = empty($_GET['post_status']) ? ' class="current"' : '';
+		$status_links[] = "<li><a href='admin.php?page=objects/objects.php'$class>" . sprintf( _nx( 'All <span class="count">(%s)</span>', 'All <span class="count">(%s)</span>', $total_posts, 'pages' ), number_format_i18n( $total_posts ) ) . '</a>';
+		foreach ( $post_stati as $status => $label ) {
+			$class = '';
 
-			echo implode( " |</li>\n", $status_links ) . '</li>';
-			unset( $status_links );
+			if ( !in_array($status, $avail_post_stati) || $num_posts->$status <= 0 )
+				continue;
+
+			if ( isset( $_GET['post_status'] ) && $status == $_GET['post_status'] )
+				$class = ' class="current"';
+
+			$status_links[] = "<li><a href='admin.php?page=objects/objects.php&post_status=$status'$class>" . sprintf( _nx( $label[2][0], $label[2][1], $num_posts->$status, $label[2][2] ), number_format_i18n( $num_posts->$status ) ) . '</a>';
+		}
+		echo implode( " |</li>\n", $status_links ) . '</li>';
+		unset($status_links);
+		endif;
 		?>
-		</ul>
+		</ul>	
+
 		
 		<form class="search-form" action="" method="get">
 		<p class="search-box">
@@ -453,11 +452,15 @@ function object_edit_page() {
 					?>
 					<tr id="object-<?php echo $objects['id']; ?>">
 						<th scope="row" class="check-column"><input type="checkbox" name="object[]" value="1" /></th>
-						<td><a href="admin.php?page=object-edit&amp;id=<?php echo  $object['id'] ?>" class="row-title"><?php echo $object['object_title']; ?></a>
+						<td><a href="admin.php?page=object-edit&amp;id=<?php echo  $object->ID; ?>" class="row-title"><?php echo $object->post_title; ?></a>
 							
 							<?php $actions = array();
-								$actions['edit'] = '<a href="admin.php?page=object-edit&id=' . $object['id'] . '" title="' . esc_attr(__('Edit this post')) . '">' . __('Edit') . '</a>';
-								$actions['delete'] = "<a class='submitdelete' title='" . esc_attr(__('Delete this post')) . "' href='" . wp_nonce_url("admin.php?page=objects/objects.php&amp;action=delete&amp;id=".$object['id'], 'delete-post_' . $object['id']) . "' onclick=\"if ( confirm('" . esc_js(sprintf(__("You are about to delete the object '%s'\n 'Cancel' to stop, 'OK' to delete."), $object['object_title'] )) . "') ) { return true;}return false;\">" . __('Delete') . "</a>";
+							if ( current_user_can('edit_page', $page->ID) && $post->post_status != 'trash' ) {
+								$actions['edit'] = '<a href="' . $edit_link . '" title="' . esc_attr(__('Edit this page')) . '">' . __('Edit') . '</a>';
+								$actions['inline'] = '<a href="#" class="editinline">' . __('Quick&nbsp;Edit') . '</a>';
+							}
+							#	$actions['edit'] = '<a href="admin.php?page=object-edit&id=' . $object->ID . '" title="' . esc_attr(__('Edit this post')) . '">' . __('Edit') . '</a>';
+								$actions['delete'] = "<a class='submitdelete' title='" . esc_attr(__('Delete this post')) . "' href='" . wp_nonce_url("admin.php?page=objects/objects.php&amp;action=delete&amp;id=".$object->ID, 'delete-post_' . $object->ID) . "' onclick=\"if ( confirm('" . esc_js(sprintf(__("You are about to delete the object '%s'\n 'Cancel' to stop, 'OK' to delete."), $object->object_title )) . "') ) { return true;}return false;\">" . __('Delete') . "</a>";
 							
 
 								$actions = apply_filters('post_row_actions', $actions, $post);
@@ -474,14 +477,13 @@ function object_edit_page() {
 							?>
 							
 						</td>
-						<td><?php echo $object['object_name']; ?></td>
+						<td><?php #echo $object['object_name']; ?></td>
 					</tr>
 					<?php } ?>
 				</tbody>
 			</table>
 			<?php endif; ?>
 		</div>
-	
 	</div>
 	<?php
 }
@@ -520,40 +522,24 @@ function object_admin_pages() {
 	
 }
 
-function object_process_object($postvars) {
-	global $wpdb, $current_user;
-	
-	
-	if (!empty($postvars['comment_status'])) { 
-		$comment_status = addslashes($postvars['comment_status']);
-	 } else { $comment_status = 'closed';}
-	
-	$object_title = addslashes($postvars['object_title']);
-	$object_content = addslashes($postvars['content']);
-	
-	
-	$tbl_name = $wpdb->prefix."objects";
+function object_process_object($post_data) {
+	global $wpdb, $current_user, $id;
+		
+	$post_data['post_content'] = isset($post_data['content']) ? $post_data['content'] : '';
+	$post_data['post_title'] = isset($post_data['object_title']) ? $post_data['object_title'] : '';
 
-	if(empty($postvars['id'])) {
-		$insert = "INSERT INTO ".$tbl_name.
-				  " (object_title, object_content, comment_status, object_date, object_modified) ".
-				  "VALUES('".$wpdb->escape($object_title)."',
-				  		'".$wpdb->escape($object_content)."',
-						  '".$wpdb->escape($comment_status)."',						
-						  '".$wpdb->escape($create_mod_time)."',
-						  '".$wpdb->escape($create_mod_time)."');";
-		$results = $wpdb->query($insert);
+	$post_data['post_status'] = 'publish';
+	$post_data['post_type'] = 'physical-object';
+
+	if (!isset( $post_data['comment_status'] ))
+		$post_data['comment_status'] = 'closed';
+
+	if(empty($post_data['id'])) {
+		$id = wp_insert_post($post_data);
 	}
 	else {
-		$update = "UPDATE ".$tbl_name.
-			  	  " SET object_title='".$wpdb->escape($object_title)."',".
-				  "object_content='".$wpdb->escape($object_content)."',".
-				  "comment_status='".$wpdb->escape($comment_status)."',".
-				  "object_modified='".$wpdb->escape($create_mod_time)."' ".
-				  "WHERE id=".$wpdb->escape($postvars['id']);
-		$results = $wpdb->query($update);
-		
-		$id = $wpdb->insert_id;
+		$post_data['ID'] = (int) $post_data['id'];
+		$id = wp_insert_post($post_data);
 		
 	}	
 }
@@ -564,10 +550,7 @@ function object_delete_object($id=null) {
 	if($id == null)
 		$id = $wpdb->escape($_POST['id']);
 		
-	$tbl_name = $wpdb->prefix."objects";
-	
-	$sql = "DELETE FROM ".$tbl_name." WHERE id=".$id;
-	$wpdb->query($sql);
+	wp_trash_post($id);
 }
 
 
