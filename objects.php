@@ -25,8 +25,8 @@ function post_type_objects() {
 										'rewrite' => array('slug' => 'objects'),
 										'can_export' => true
 										));
-	 register_taxonomy( 'object-tags', 'object', array( 'hierarchical' => false, 'label' => __('Tags'), 'public' => true,	'show_ui' => true 	) ); 
-	 register_taxonomy( 'collections', 'object', array( 'hierarchical' => true, 'label' => __('Collections'), 'public' => true,	'show_ui' => true 	) ); 
+	 register_taxonomy( 'object-tags', 'object', array( 'hierarchical' => false, 'label' => __('Tags'), 'public' => true,	'show_ui' => true, 'show_tagclour' => true) ); 
+	 register_taxonomy( 'collections', 'object', array( 'hierarchical' => true, 'label' => __('Collections'), 'labels' => array('singular_name' => 'Collection', 'search_items' => 'Search Collections', 'popular_items' => 'Popular Collections', 'all_items' => 'All Collections', 'parent_item' => 'Parent Collection', 'parent_item_colon' => 'Parent Collection:', 'edit_item' => 'Edit Collection', 'update_item' => 'Update Collection', 'add_new_item' => 'Add Collection', 'new_item_name' => 'New Collection Name'), 'public' => true,	'show_ui' => true 	) ); 
 										
 }
 
