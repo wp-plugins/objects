@@ -2,7 +2,7 @@
 /*
 Plugin Name: Object Collections
 Description: Manage your object collection with Wordpress
-Version: 0.1
+Version: 1.0
 Author: Frankie Roberto
 Author URI: http://www.frankieroberto.com
 Tags: museums, collection, objects
