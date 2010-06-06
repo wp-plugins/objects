@@ -242,7 +242,7 @@ function post_type_objects() {
 	register_post_type( 'objects',
                 array( 'label' => __('Objects'), 'public' => true, 'show_ui' => true ) );
 }
-add_action('init', 'post_type_movies');
+add_action('init', 'post_type_objects');
 
 
 #add_action('activate_objects', "objects_install");
