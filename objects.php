@@ -9,39 +9,11 @@ Tags: museums, collection, objects
 */
 
 // Plugin DB Installation
-function objects_install() {
-#	get_currentuserinfo();
-	
-	global $wpdb;
-	$table_name = $wpdb->prefix."objects";
+//function objects_install() {
+//
+//}
+//register_activation_hook(__FILE__, "objects_install");
 
-	// Check if DB exists and add it if necessary
-//	if($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
-		$sql = "CREATE TABLE ".$table_name."(
-			ID bigint(9) NOT NULL AUTO_INCREMENT,
-			object_title text NOT NULL,
-			object_content longtext NOT NULL,
-			object_date datetime NOT NULL,
-			object_modified datetime NOT NULL,
-			object_name varchar(200) NOT NULL,
-			object_status varchar(20) NOT NULL,
-			comment_status varchar(20) NOT NULL,
-			PRIMARY KEY  id (id)
-		);";
-	
-		require_once(ABSPATH.'wp-admin/upgrade-functions.php');
-		dbDelta($sql);
-//	}
-
-
-}
-register_activation_hook(__FILE__, "objects_install");
-
-function add_object_urls() {
-	add_rewrite_rule('(collection)/([0-9]+)$', 'index.php?object_id=$matches[1]');
-  add_rewrite_tag('%object_id%', '[0-9]+');	
-}
-add_action('init', 'add_object_urls');
 
 function object_submit_meta_box($object) {
 ?>
@@ -236,343 +208,41 @@ function object_comments_status_meta_box($object){
 <?php
 }
 
-function object_edit_form() {
-	wp_print_scripts('editor');
-	if(function_exists('wp_tiny_mce')) wp_tiny_mce();
-	
-	
-	global $wpdb; 
-	global $id;
-	if (isset($_GET['id'])) {
-		$id = $_GET['id'];
-	} elseif (isset($_POST['id'])) {
-		$id = $_POST['id'];
-		$message = "Object updated.";
-	}	
-	
-	if (isset($id)) {
-		
-		$sql = "SELECT * "
-		."FROM " . $wpdb->prefix."objects"
-		." WHERE ID=".$wpdb->escape($id) .";";
-		$objects = $wpdb->get_results($sql, ARRAY_A);
-		$object = $objects[0];
-		$object_id = $object['ID'];
-
-	}
-	get_currentuserinfo();
-	global $user_ID;	
-
-?> 
-<?php
-if(!is_null($message)) {
-?>
-	<div id="message" class="updated fade">
-		<p>
-			<?php echo $message; ?>
-		</p>
-	</div>
-<?php
-}
-?>
-
-		<div class="wrap">
-			<h2><?php echo $object_id ? __("Edit Event") : __("Add New Object"); ?></h2>
-			
-			<form name="object" action="admin.php?page=object-edit" method="post" id="post">
-				<?php if(!empty($object_id)) { ?>
-					<input type="hidden" name="id" value="<?php echo $object_id; ?>" />
-				<?php	}	?>
-
-			
-				<div id="poststuff" class="metabox-holder has-right-sidebar">
-
-					<div id="side-info-column" class="inner-sidebar">
-						<?php
-
-							#do_action('submitlink_box');
-							$side_meta_boxes = do_meta_boxes( 'object', 'side', $object);
-
-						?>
-					</div>
-			
-					<div id="post-body">
-						<div id="post-body-content">
-
-							<div id="titlediv">
-								<div id="titlewrap">
-									<label class="screen-reader-text" for="title"><?php _e('Title') ?></label>
-									<input type="text" name="object_title" size="30" tabindex="1" value="<?php echo esc_attr( htmlspecialchars( $object['object_title'] ) ); ?>" id="title" autocomplete="off" />			
-								</div>
-								<div class="inside">
-									<div id="edit-slug-box">
-										<strong>Permalink:</strong>
-										<span id="sample-permalink">
-											http://www.blah.com/objects/<?php echo $object['object_name']; ?>
-										</span>
-									</div>
-								</div>
-							</div>
-							
-							<div id="postdivrich" class="postarea">
-								<?php #the_editor(, "content", "titlediv", true); ?>
-								<?php the_editor(stripslashes(stripslashes($object['object_content'])) /*content*/, "content" /*id*/, "sample-permalink" /*prev_id*/, true /*media_buttons*/, 15 /*tab_index*/); ?>
-
-								<table id="post-status-info" cellspacing="0">
-									<tbody>
-										<tr>
-											<td id="wp-word-count"></td>
-											<td class="autosave-info">
-												<span id="autosave">&nbsp;</span>
-											</td>
-										</tr>
-									</tbody>
-								</table>
-
-								<?php
-								wp_nonce_field( 'autosave', 'autosavenonce', false );
-								wp_nonce_field( 'closedpostboxes', 'closedpostboxesnonce', false );
-								wp_nonce_field( 'getpermalink', 'getpermalinknonce', false );
-								wp_nonce_field( 'samplepermalink', 'samplepermalinknonce', false );
-								wp_nonce_field( 'meta-box-order', 'meta-box-order-nonce', false ); ?>
-							</div>							
-							
-							<?php do_meta_boxes('object', 'normal', $object); ?>
-							
-						</div>
-					</div>
-
-				</div>
-			</form>
-		</div>	
-<?php
-	
-}
-
-function object_edit_page() {
-	global $wpdb;
-	$title = "Edit Objects";
-
-	if($_GET['action'] == "delete") {
-		object_delete_object($_GET['id']);
-		return;
-		echo("deleted");
-	}
-
-	// Check how many objects there are
-	$sql = "SELECT ID FROM ".$wpdb->prefix."objects";
-	$wpdb->query($sql);
-	$totalobjects = $wpdb->num_rows;
-
-	// Get objects for this page
-	$sql = "SELECT id, object_title, object_name, object_status"
-		 ." FROM ".$wpdb->prefix."objects"
-		 ." ORDER BY object_date DESC";
-		$wpdb->show_errors();
-	$objects = $wpdb->get_results($sql, ARRAY_A);
-	
-	
-	?>
-	<div class="wrap">
-		<?php # screen_icon(); ?>
-		<h2><?php echo esc_html( $title ); ?></h2>
-	
-	
-		<ul class="subsubsub">
-		<?php
-			$status_links = array();
-			$num_posts = $totalobjects;
-			$total_posts = array_sum( (array) $num_posts );
-			$class = empty( $_GET['object_status'] ) ? ' class="current"' : '';
-			$status_links[] = "<li><a href='admin.php?page=objects/objects.php' $class>" . sprintf( _nx( 'All <span class="count">(%s)</span>', 'All <span class="count">(%s)</span>', $total_posts, 'posts' ), number_format_i18n( $total_posts ) ) . '</a>';
-
-			$status_links[] = "<li><a href='admin.php?page=objects/objects.php&amp;post_status=draft'>" . sprintf( _n("Draft", "Drafts", 10), number_format_i18n(10) ) . '</a>';
-			
-
-			echo implode( " |</li>\n", $status_links ) . '</li>';
-			unset( $status_links );
-		?>
-		</ul>
-		
-		<form class="search-form" action="" method="get">
-		<p class="search-box">
-			<label class="screen-reader-text" for="object-search-input"><?php _e( 'Search Objects' ); ?>:</label>
-			<input type="text" id="object-search-input" name="s" value="<?php _admin_search_query(); ?>" />
-			<input type="submit" value="<?php esc_attr_e( 'Search Objects' ); ?>" class="button" />
-		</p>
-		</form>
-		<br class="clear" />
-		
-		
-		<div class="tablenav">
-			<?php
-			$page_links = paginate_links( array(
-				'base' => add_query_arg( 'paged', '%#%' ),
-				'format' => '',
-				'prev_text' => __('&laquo;'),
-				'next_text' => __('&raquo;'),
-				'total' => $totalobjects,
-				'current' => $_GET['paged']
-			));
-
-			?>
-			
-			<?php if ( $page_links ) { ?>
-			<div class="tablenav-pages"><?php $page_links_text = sprintf( '<span class="displaying-num">' . __( 'Displaying %s&#8211;%s of %s' ) . '</span>%s',
-				number_format_i18n( ( $_GET['paged'] - 1 ) * $wp_query->query_vars['posts_per_page'] + 1 ),
-				number_format_i18n( min( $_GET['paged'] * $wp_query->query_vars['posts_per_page'], $wp_query->found_posts ) ),
-				number_format_i18n( $wp_query->found_posts ),
-				$page_links
-			); echo $page_links_text; ?>
-			</div>
-			<?php } ?>
-			
-			<?php if ($objects) : ?>
-			<table class="widefat post fixed" cellspacing="0">
-				<thead>
-					<tr>
-							<th scope="col" id="cb" class="manage-column column-cb check-column" style=""><input type="checkbox" /></th>
-							<th scope="col"><?php _e("Title"); ?></th>
-							<th scope="col"><?php _e("Number"); ?></th>
-						</tr>
-					</tr>
-				</thead>
-
-				<tfoot>
-					<tr>
-						<th scope="col" id="cb" class="manage-column column-cb check-column" style=""><input type="checkbox" /></th>
-						<th scope="col"><?php _e("Title"); ?></th>
-						<th scope="col"><?php _e("Number"); ?></th>
-					</tr>					
-				</tfoot>
-
-				<tbody>
-					<?php
-					foreach($objects as $object) {
-						$class = $i % 2 == 0 ? " class='alternate'" : "";
-					?>
-					<tr id="object-<?php echo $objects['id']; ?>">
-						<th scope="row" class="check-column"><input type="checkbox" name="object[]" value="1" /></th>
-						<td><a href="admin.php?page=object-edit&amp;id=<?php echo  $object['id'] ?>" class="row-title"><?php echo $object['object_title']; ?></a>
-							
-							<?php $actions = array();
-								$actions['edit'] = '<a href="admin.php?page=object-edit&id=' . $object['id'] . '" title="' . esc_attr(__('Edit this post')) . '">' . __('Edit') . '</a>';
-								$actions['delete'] = "<a class='submitdelete' title='" . esc_attr(__('Delete this post')) . "' href='" . wp_nonce_url("admin.php?page=objects/objects.php&amp;action=delete&amp;id=".$object['id'], 'delete-post_' . $object['id']) . "' onclick=\"if ( confirm('" . esc_js(sprintf(__("You are about to delete the object '%s'\n 'Cancel' to stop, 'OK' to delete."), $object['object_title'] )) . "') ) { return true;}return false;\">" . __('Delete') . "</a>";
-							
-
-								$actions = apply_filters('post_row_actions', $actions, $post);
-								$action_count = count($actions);
-								$j = 0;
-								echo '<div class="row-actions">';
-								foreach ( $actions as $action => $link ) {
-									++$j;
-									( $j == $action_count ) ? $sep = '' : $sep = ' | ';
-									echo "<span class='$action'>$link$sep</span>";
-								}
-								echo '</div>';
-							
-							?>
-							
-						</td>
-						<td><?php echo $object['object_name']; ?></td>
-					</tr>
-					<?php } ?>
-				</tbody>
-			</table>
-			<?php endif; ?>
-		</div>
-	
-	</div>
-	<?php
-}
-
-function object_new_page() {
-	if ($_POST['object_title']) {
-		object_process_object($_POST);		
-	}
-	
-	object_edit_form();
-}
-
 function object_admin_pages() {
-	add_object_page(__("Object"), __("Objects"), 2, plugin_basename(__FILE__), "object_edit_page");
-	add_submenu_page(plugin_basename(__FILE__), __("Edit"), __("Edit"), 2, "objects/objects.php", "object_edit_page", plugin_basename(__FILE__));
-	add_submenu_page(plugin_basename(__FILE__), __("Add New"), __("Add New"), 2, "object-edit", "object_new_page");
+//	add_object_page(__("Object"), __("Objects"), 2, plugin_basename(__FILE__), "object_edit_page");
+//	add_submenu_page(plugin_basename(__FILE__), __("Edit"), __("Edit"), 2, "objects/objects.php", "object_edit_page", plugin_basename(__FILE__));
+//	add_submenu_page(plugin_basename(__FILE__), __("Add New"), __("Add New"), 2, "object-edit", "object_new_page");
 
-	add_meta_box('pagesubmitdiv', __('Save'), 'object_submit_meta_box', 'object', 'side', 'core');
-	add_meta_box('pagecommentstatusdiv', __('Discussion'), 'object_comments_status_meta_box', 'object', 'normal', 'core');
+//	add_meta_box('pagesubmitdiv', __('Save'), 'object_submit_meta_box', 'object', 'side', 'core');
+//	add_meta_box('pagecommentstatusdiv', __('Discussion'), 'object_comments_status_meta_box', 'object', 'normal', 'core');
 	
-	do_action('do_meta_boxes', 'object', 'normal');
-	do_action('do_meta_boxes', 'object', 'advanced');
-	do_action('do_meta_boxes', 'object', 'side');	
+//	do_action('do_meta_boxes', 'object', 'normal');
+//	do_action('do_meta_boxes', 'object', 'advanced');
+//	do_action('do_meta_boxes', 'object', 'side');	
 
 	// all tag-style post taxonomies
-	foreach ( get_object_taxonomies('post') as $tax_name ) {
-		if ( !is_taxonomy_hierarchical($tax_name) ) {
-			$taxonomy = get_taxonomy($tax_name);
-			$label = isset($taxonomy->label) ? esc_attr($taxonomy->label) : $tax_name;
-			$label = "Object Tags";
+//	foreach ( get_object_taxonomies('post') as $tax_name ) {
+//		if ( !is_taxonomy_hierarchical($tax_name) ) {
+//			$taxonomy = get_taxonomy($tax_name);
+//			$label = isset($taxonomy->label) ? esc_attr($taxonomy->label) : $tax_name;
+//			$label = "Object Tags";
 
-			add_meta_box('tagsdiv-' . $tax_name, $label, 'object_tags_meta_box', 'object', 'side', 'core');
-		}
-	}
+//			add_meta_box('tagsdiv-' . $tax_name, $label, 'object_tags_meta_box', 'object', 'side', 'core');
+//		}
+//	}
 	
 	
 }
 
-function object_process_object($postvars) {
-	global $wpdb, $current_user;
-	
-	
-	if (!empty($postvars['comment_status'])) { 
-		$comment_status = addslashes($postvars['comment_status']);
-	 } else { $comment_status = 'closed';}
-	
-	$object_title = addslashes($postvars['object_title']);
-	$object_content = addslashes($postvars['content']);
-	
-	
-	$tbl_name = $wpdb->prefix."objects";
 
-	if(empty($postvars['id'])) {
-		$insert = "INSERT INTO ".$tbl_name.
-				  " (object_title, object_content, comment_status, object_date, object_modified) ".
-				  "VALUES('".$wpdb->escape($object_title)."',
-				  		'".$wpdb->escape($object_content)."',
-						  '".$wpdb->escape($comment_status)."',						
-						  '".$wpdb->escape($create_mod_time)."',
-						  '".$wpdb->escape($create_mod_time)."');";
-		$results = $wpdb->query($insert);
-	}
-	else {
-		$update = "UPDATE ".$tbl_name.
-			  	  " SET object_title='".$wpdb->escape($object_title)."',".
-				  "object_content='".$wpdb->escape($object_content)."',".
-				  "comment_status='".$wpdb->escape($comment_status)."',".
-				  "object_modified='".$wpdb->escape($create_mod_time)."' ".
-				  "WHERE id=".$wpdb->escape($postvars['id']);
-		$results = $wpdb->query($update);
-		
-		$id = $wpdb->insert_id;
-		
-	}	
+
+// add_action('admin_menu', 'object_admin_pages');
+
+function post_type_objects() {
+	register_post_type( 'objects',
+                array( 'label' => __('Objects'), 'public' => true, 'show_ui' => true ) );
 }
-
-function object_delete_object($id=null) {
-	global $wpdb;
-	
-	if($id == null)
-		$id = $wpdb->escape($_POST['id']);
-		
-	$tbl_name = $wpdb->prefix."objects";
-	
-	$sql = "DELETE FROM ".$tbl_name." WHERE id=".$id;
-	$wpdb->query($sql);
-}
-
-
-add_action('admin_menu', 'object_admin_pages');
-
+add_action('init', 'post_type_movies');
 
 
 #add_action('activate_objects', "objects_install");
