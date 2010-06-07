@@ -103,8 +103,22 @@ function add_object_meta_boxes() {
 
 }
 
+function show_object_settings_page() {
+
+	
+	?>	<div class="wrap"><?php screen_icon(); ?>
+	<h2><?php echo esc_html( 'Object Settings' ); ?></h2>	
+		</div>
+	<?php
+}
+
+function add_object_settings() {
+	add_options_page('Object settings', 'Objects', 'manage_options', 'object_settings', 'show_object_settings_page');
+}
+
 
 add_action('admin_menu', 'add_object_meta_boxes');
+add_action('admin_menu', 'add_object_settings');
 add_action('save_post', 'object_info_save');
 
 
